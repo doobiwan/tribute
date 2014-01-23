@@ -45,9 +45,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IExchange.cs" />
+    <Compile Include="ExchangeListener.cs" />
+    <Compile Include="IStartable.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ExchangeRequest.cs" />
+    <Compile Include="ExchangeResponse.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <ItemGroup>

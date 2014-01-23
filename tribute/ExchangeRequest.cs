@@ -12,7 +12,7 @@ using ErrorEventArgs = BookSleeve.ErrorEventArgs;
 
 namespace tribute
 {
-    public class ExchangeRequest : IExchange
+    public class ExchangeRequest
     {
         private readonly RedisConnection connection;
         private int db = 0;
@@ -32,7 +32,7 @@ namespace tribute
             return Utility.Deserialize<TResponse>(responseData);
         }
 
-        public async Task<byte[]> SubmitRequestAsync(byte[] requestData, string exchangeName = null)
+        private async Task<byte[]> SubmitRequestAsync(byte[] requestData, string exchangeName = null)
         {
             byte[] response = null;
             var queue = exchangeName + "_queue";
@@ -43,39 +43,27 @@ namespace tribute
             {
                 try
                 {
-                    sub.Error += OnErrorHandler;
+                    sub.Error += Utility.OnErrorHandler;
+                    var responseSignal = new ManualResetEventSlim();
+                    var requestId = Utility.GetObjectHash(requestData);
 
-                    await sub.Subscribe(GetRequestHash(requestData), (s, bytes) =>
+                    await sub.Subscribe(requestId, (s, bytes) =>
                     {
                         response = bytes;
+                        responseSignal.Set();
                     });
 
-                    await connection.Lists.AddLast(db, queue, requestData);
+                    await connection.Strings.Set(db, requestId, requestData);
+                    await connection.Lists.AddLast(db, queue, requestId);
 
-                    SpinWait.SpinUntil(() => response != null, TimeSpan.FromSeconds(requestTimeout));
+                    responseSignal.Wait(TimeSpan.FromSeconds(requestTimeout));
                     return response;
                 }
                 finally
                 {
-                    sub.Error -= OnErrorHandler;
+                    sub.Error -= Utility.OnErrorHandler;
                 }
             }
-        }
-
-        private void OnErrorHandler(object sender, ErrorEventArgs args)
-        {
-            Debugger.Break();
-            throw (args.Exception);
-        }
-
-        private string GetRequestHash(byte[] requestData)
-        {
-            string hash;
-            using (var sha1 = new SHA1CryptoServiceProvider())
-            {
-                hash = Convert.ToBase64String(sha1.ComputeHash(requestData));
-            }
-            return hash;
         }
     }
 }
